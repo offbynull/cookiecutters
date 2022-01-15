@@ -1,4 +1,5 @@
 #!/bin/bash
+mkdir -p build
 cd build
 CC={{cookiecutter.cc}} CXX={{cookiecutter.cxx}} conan profile new {{cookiecutter.project_name}} --detect
 # libcxx=libstdc++11 required because gtest is breaking: 
