@@ -1,0 +1,6 @@
+{
+    "project_name": "cookiecutter",
+    "_copy_without_render": [
+        "hooks/*"
+    ]
+}

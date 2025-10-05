@@ -1,0 +1,7 @@
+{
+    "project_name": "cpp",
+    "include_boost": true,
+    "include_cli": true,
+    "include_unittests": true,
+    "include_python_extension": ["true_with_numpy", "true", "false"]
+}
