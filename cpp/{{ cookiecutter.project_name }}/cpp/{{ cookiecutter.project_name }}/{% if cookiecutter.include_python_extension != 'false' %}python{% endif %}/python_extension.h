@@ -62,10 +62,10 @@ namespace {{ cookiecutter.project_name }}::python_extension::python_extension {
         };
 
         static struct PyModuleDef Module = {
-            PyModuleDef_HEAD_INIT, "helpers", nullptr, -1, Methods
+            PyModuleDef_HEAD_INIT, "{{ cookiecutter.project_name }}._native.{{ cookiecutter.project_name }}_python_extension", nullptr, -1, Methods
         };
 
-        PyMODINIT_FUNC PyInit_helpers(void) {
+        PyMODINIT_FUNC PyInit_{{ cookiecutter.project_name }}_python_extension(void) {
             return PyModule_Create(&Module);
         }
     }

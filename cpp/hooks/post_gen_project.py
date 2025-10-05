@@ -21,14 +21,6 @@ import subprocess
 
 if __name__ == '__main__':
     {% if cookiecutter.include_unittests %}
-    try:
-        subprocess.run(['meson', 'wrap', 'install', 'gtest'], cwd='cpp', capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print("Command failed with error:")
-        print("Exit Code:", e.returncode)
-        print("STDOUT:", e.stdout)
-        print("STDERR:", e.stderr)
-    except FileNotFoundError:
-        print("Error: Command not found.")
+    subprocess.run(['meson', 'wrap', 'install', 'gtest'], cwd='cpp', capture_output=True, check=True)
     {% endif %}
     ...

@@ -183,7 +183,7 @@ py_sources = [
         '{{ cookiecutter.project_name }}/python/python_extension.h'
 ]
 py_debug = py_installation.extension_module(
-        '{{ cookiecutter.project_name }}_python_debug',
+        '{{ cookiecutter.project_name }}_python_extension_debug',
         py_sources,
         {% if cookiecutter.include_source_checker %} source_checker {% endif %},
         {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
@@ -195,7 +195,7 @@ py_debug = py_installation.extension_module(
         link_args: base_debug_link_args
 )
 py_release = py_installation.extension_module(
-        '{{ cookiecutter.project_name }}_python_release',
+        '{{ cookiecutter.project_name }}_python_extension_release',
         py_sources,
         {% if cookiecutter.include_source_checker %} source_checker {% endif %},
         {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
