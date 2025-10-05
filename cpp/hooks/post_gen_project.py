@@ -19,17 +19,10 @@
 import sys
 import subprocess
 
-def is_docker_installed() -> bool:
-    try:
-        subprocess.run(['docker', '--version'], capture_output=True, check=True)
-        return True
-    except Exception:
-        return False
-
 if __name__ == '__main__':
     {% if cookiecutter.include_unittests %}
     try:
-        subprocess.run(['meson', 'wrap', 'install', 'gtest'], capture_output=True, check=True)
+        subprocess.run(['meson', 'wrap', 'install', 'gtest'], cwd='cpp', capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         print("Command failed with error:")
         print("Exit Code:", e.returncode)

@@ -12,6 +12,31 @@ boost_dep = dependency('boost', modules : ['container', 'filesystem', 'iostreams
 dependencies += [boost_dep]
 {% endif %}
 
+{% if cookiecutter.include_source_checker %}
+# Load source checker target
+# --------------------------
+python3 = find_program('python3', required: true)
+source_checker = custom_target(
+        'source_checker',
+        command: ['python3', meson.current_source_dir() + '/source_checker.py'],
+        output: ['unused'],
+        build_always_stale: true
+)
+{% endif %}
+
+{% if cookiecutter.include_doxygen %}
+# Load doxygen target
+# -------------------
+python3 = find_program('python3', required: true)
+dot = find_program('dot', required: true)
+doxygen = find_program('doxygen', required: true)
+doc_generator = custom_target(
+        'doc_generator',
+        command: ['python3', meson.current_source_dir() + '/source_doxygen_runner.py'],
+        output : ['docs'],
+        build_always_stale: true
+)
+{% endif %}
 
 # Configure options
 # -----------------
@@ -85,6 +110,8 @@ cli_sources = [
 cli_debug = executable(
         '{{ cookiecutter.project_name }}_cli_debug',
         cli_sources,
+        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
+        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
         dependencies: dependencies,
         override_options: base_debug_override_options,
         cpp_args: base_debug_cpp_args,
@@ -93,6 +120,8 @@ cli_debug = executable(
 cli_release = executable(
         '{{ cookiecutter.project_name }}_cli_release',
         cli_sources,
+        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
+        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
         dependencies: dependencies,
         override_options: base_release_override_options,
         cpp_args: base_release_cpp_args,
@@ -156,6 +185,8 @@ py_sources = [
 py_debug = py_installation.extension_module(
         '{{ cookiecutter.project_name }}_python_debug',
         py_sources,
+        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
+        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
         install: true,
         dependencies: dependencies,
         include_directories: py_includes,
@@ -166,6 +197,8 @@ py_debug = py_installation.extension_module(
 py_release = py_installation.extension_module(
         '{{ cookiecutter.project_name }}_python_release',
         py_sources,
+        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
+        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
         install: true,
         dependencies: dependencies,
         include_directories: py_includes,
