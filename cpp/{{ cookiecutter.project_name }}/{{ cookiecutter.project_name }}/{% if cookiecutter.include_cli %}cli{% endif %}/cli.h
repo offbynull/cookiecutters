@@ -1,5 +1,5 @@
-#ifndef "{{ cookiecutter.project_name|upper }}_CLI_CLI_H"
-#define "{{ cookiecutter.project_name|upper }}_CLI_CLI_H"
+#ifndef {{ cookiecutter.project_name|upper }}_CLI_CLI_H
+#define {{ cookiecutter.project_name|upper }}_CLI_CLI_H
 
 #include "{{ cookiecutter.project_name }}/math/helpers.h"
 
@@ -8,7 +8,7 @@ namespace {{ cookiecutter.project_name }}::cli::cli {
 
     struct CommandLineInterface {
         int main(int argc, char* argv[]) {
-            return Helpers::average({1, 2, 3});
+            return Helpers<int>::average({1, 2, 3});
         }
     };
 }

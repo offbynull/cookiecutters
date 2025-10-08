@@ -140,10 +140,11 @@ gtest_sources = [
         'gtest-all.cpp',
         '{{ cookiecutter.project_name }}/math/helpers_test.cpp'
 ]
+gtest_dependencies = dependencies + [gtest_dep]
 gtest_debug = executable(
         '{{ cookiecutter.project_name }}_gtest_debug',
         gtest_sources,
-        dependencies: dependencies,
+        dependencies: gtest_dependencies,
         override_options: base_debug_override_options,
         cpp_args: base_debug_cpp_args,
         link_args: base_debug_link_args
@@ -152,7 +153,7 @@ test('gtest_debug', gtest_debug)
 gtest_release = executable(
         '{{ cookiecutter.project_name }}_gtest_release',
         gtest_sources,
-        dependencies: dependencies,
+        dependencies: gtest_dependencies,
         override_options: base_release_override_options,
         cpp_args: base_release_cpp_args,
         link_args: base_release_link_args
@@ -169,6 +170,17 @@ py_installation = py.find_installation(
         pure: false,
         modules: [{% if cookiecutter.include_python_extension == 'true_with_numpy' %}'numpy'{% endif %}]
 )
+# Include python files must be listed here for inclusion into generated Python package (py and pyi - will non-python files like JSON also work?).
+py_installation.install_sources(
+        [
+                '{{ cookiecutter.project_name }}/__init__.py',
+                '{{ cookiecutter.project_name }}/math/__init__.py',
+                '{{ cookiecutter.project_name }}/math/helpers.py',
+                '{{ cookiecutter.project_name }}/math/helpers_python_extension.pyi',
+        ],
+        preserve_path: true
+)
+# Compile and include python C extension
 {% if cookiecutter.include_python_extension == 'true_with_numpy' %}
 py_numpy_include_dir = run_command(
         py_installation.full_path(),
@@ -179,27 +191,14 @@ py_includes = include_directories(py_numpy_include_dir)
 {% else %}
 py_includes = include_directories()
 {% endif %}
-py_sources = [
-        '{{ cookiecutter.project_name }}/python/python_extension.h'
-]
-py_debug = py_installation.extension_module(
-        '{{ cookiecutter.project_name }}_python_extension_debug',
-        py_sources,
-        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
-        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
-        install: true,
-        dependencies: dependencies,
-        include_directories: py_includes,
-        override_options: base_debug_override_options,
-        cpp_args: base_debug_cpp_args,
-        link_args: base_debug_link_args
-)
 py_release = py_installation.extension_module(
-        '{{ cookiecutter.project_name }}_python_extension_release',
-        py_sources,
-        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
-        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
+        'helpers_python_extension',  # Must match name module name in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
+        [
+                '{{ cookiecutter.project_name }}/math/helpers_python_extension.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
+        ],
+        {% if cookiecutter.include_source_checker %}source_checker,{% endif %}
         install: true,
+        subdir: '{{ cookiecutter.project_name }}/math',  # Must package path in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
         dependencies: dependencies,
         include_directories: py_includes,
         override_options: base_release_override_options,

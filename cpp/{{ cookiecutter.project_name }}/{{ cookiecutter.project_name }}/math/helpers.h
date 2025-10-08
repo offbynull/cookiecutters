@@ -1,5 +1,5 @@
-#ifndef "{{ cookiecutter.project_name|upper }}_MATH_HELPERS_H"
-#define "{{ cookiecutter.project_name|upper }}_MATH_HELPERS_H"
+#ifndef {{ cookiecutter.project_name|upper }}_MATH_HELPERS_H
+#define {{ cookiecutter.project_name|upper }}_MATH_HELPERS_H
 
 #include <vector>
 #include <numeric>

@@ -19,8 +19,17 @@
 import sys
 import subprocess
 
+def run(cmd: list[str]):
+    print(f'Running {cmd}')
+    p = subprocess.run(cmd, capture_output=True, check=False)
+    if p.returncode != 0:
+        print(p.stdout)
+        print(p.stderr)
+        raise ValueError('Failed')
+
 if __name__ == '__main__':
     {% if cookiecutter.include_unittests %}
-    subprocess.run(['meson', 'wrap', 'install', 'gtest'], cwd='cpp', capture_output=True, check=True)
+    run(['meson', 'wrap', 'install', 'gtest'])
+    run(['meson', 'setup', '--reconfigure', 'buildDir'])
     {% endif %}
     ...
