@@ -3,19 +3,6 @@
 # Working dir: Root of the generated project
 # Template variables: Yes
 
-# EXAMPLE
-# -------
-# import os
-#
-# REMOVE_PATHS = [
-#     '{% if 'pip' in cookiecutter.project_name %}requirements.txt{% endif %}',
-#     '{% if 'poetry' in cookiecutter.project_name %}poetry.lock{% endif %}',
-# ]
-#
-# for path in REMOVE_PATHS:
-#     path = path.strip()
-#     if path and os.path.exists(path):
-#         os.unlink(path) if os.path.isfile(path) else os.rmdir(path)
 import sys
 import subprocess
 
@@ -28,8 +15,14 @@ def run(cmd: list[str]):
         raise ValueError('Failed')
 
 if __name__ == '__main__':
-    {% if cookiecutter.include_unittests %}
+    {% if cookiecutter.include_gtest %}
     run(['meson', 'wrap', 'install', 'gtest'])
-    run(['meson', 'setup', '--reconfigure', 'buildDir'])
     {% endif %}
-    ...
+    run(['meson', 'setup', '--reconfigure', 'buildDir', '--buildtype=debug'])
+    run(['meson', 'compile', '-C', 'buildDir'])
+    print('The project has been successfully created!')
+    print()
+    print('README.md contents:')
+    with open('README.md', 'r') as f:
+        content = f.read()
+        print(content, end='')

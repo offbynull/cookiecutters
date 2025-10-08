@@ -3,14 +3,34 @@
 # Working dir: Root of the generated project
 # Template variables: Yes
 
-# EXAMPLE
-# -------
-# import re
-# import sys
-#
-# MODULE_REGEX = r'^[_a-zA-Z][_a-zA-Z0-9]+$'
-# project_name = '{{ cookiecutter.project_name }}'
-#
-# if not re.match(MODULE_REGEX, project_name):
-#     print(f'ERROR: {project_name} is not a valid Python module name!')
-#     sys.exit(1)
+import re
+import subprocess
+
+def try_int(s: str):
+    try:
+        return int(s)
+    except ValueError:
+        return s
+
+def find_pip_package_version(
+    package: str,
+    version_pattern: str = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?'  # semver
+) -> tuple[int | str, ...]:
+    print(f'Checking version of Python package {package}: ', end='')
+    p = subprocess.run(['pip', 'show', package], capture_output=True, check=True)
+    m_list = re.findall(
+        version_pattern,
+        str(p.stdout)
+    )
+    if len(m_list) == 0:
+        raise ValueError(f'No version found\n\n{m_list}\n\n{p.stdout}')
+    print(m_list[0])
+    return tuple(try_int(g) for g in m_list[0])
+
+if __name__ == '__main__':
+    {% if cookiecutter.include_python_extension != 'false' %}
+    python_build_ver = find_pip_package_version('build')
+    if not(python_build_ver[0:2] >= (1, 0)):
+        raise ValueError(f'Bad python build version {python_build_ver}')
+    {% endif %}
+    ...

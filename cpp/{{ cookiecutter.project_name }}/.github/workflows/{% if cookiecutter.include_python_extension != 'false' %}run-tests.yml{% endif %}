@@ -1,0 +1,64 @@
+name: run-tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ pkg-config libboost-all-dev
+          python -m pip install --upgrade pip
+          python -m pip install build meson ninja
+      - name: Run unittests
+        run: |
+          meson setup --reconfigure buildDir --buildtype=debug
+          meson compile -C buildDir gtest
+          ./buildDir/gtest
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          msystem: ucrt64
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkg-config
+      - name: Run unittests
+        shell: msys2 {0}
+        run: |
+          meson setup --reconfigure buildDir --buildtype=debug
+          meson compile -C buildDir gtest
+          ./buildDir/gtest.exe
+  test-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          brew update
+          brew install gcc boost pkg-config
+          python -m pip install --upgrade pip
+          python -m pip install build meson ninja
+      - name: Run unittests
+        run: |
+          meson setup --reconfigure buildDir --buildtype=debug
+          meson compile -C buildDir gtest
+          ./buildDir/gtest

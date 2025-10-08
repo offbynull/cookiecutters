@@ -1,9 +1,12 @@
 {
     "project_name": "cpp",
-    "include_boost": true,
+    "min_boost_version": "1.83.0",
     "include_cli": true,
-    "include_unittests": true,
+    "include_gtest": true,
     "include_python_extension": ["true_with_numpy", "true", "false"],
     "include_doxygen": true,
-    "include_source_checker": true
+    "include_source_checker": true,
+    "__prompts__": {
+        "min_boost_version": "min_boost_version - enter 'na' to exclude boost"
+    }
 }

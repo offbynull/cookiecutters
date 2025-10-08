@@ -1,14 +1,20 @@
-project('{{ cookiecutter.project_name }}', 'cpp',
+project(
+        '{{ cookiecutter.project_name }}',
+        'cpp',
         version : '1.0.0',
-        default_options : ['warning_level=everything', 'cpp_std=c++23'])
-
+        default_options : ['warning_level=everything', 'cpp_std=c++23']
+)
 
 dependencies = []
 
-{% if cookiecutter.include_boost %}
+{% if cookiecutter.min_boost_version != 'na' %}
 # Include boost dependency
 # ------------------------
-boost_dep = dependency('boost', modules : ['container', 'filesystem', 'iostreams'])
+boost_dep = dependency(
+        'boost',
+        version : '>={{ cookiecutter.min_boost_version }}',
+        modules : ['container', 'filesystem', 'iostreams']
+)
 dependencies += [boost_dep]
 {% endif %}
 
@@ -41,8 +47,8 @@ doc_generator = custom_target(
 # Configure options
 # -----------------
 base_override_options = []
-base_debug_override_options = base_override_options + ['optimization=0', 'buildtype=debug', 'b_lto=false', 'b_ndebug=false', 'debug=true', 'cpp_debugstl=true']
-base_release_override_options = base_override_options +['optimization=3', 'buildtype=release', 'b_lto=true', 'b_ndebug=true', 'debug=false', 'cpp_debugstl=false']
+base_debug_override_options = base_override_options + ['b_lto=false', 'b_ndebug=false', 'debug=true', 'cpp_debugstl=true'] # + ['optimization=0', 'buildtype=debug']
+base_release_override_options = base_override_options + ['b_lto=true', 'b_ndebug=true', 'debug=false', 'cpp_debugstl=false'] # + ['optimization=3', 'buildtype=release']
 cc = meson.get_compiler('cpp')
 if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
         # Configure base arguments for compiling / linking
@@ -69,7 +75,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
         base_cpp_args += ['-Wno-abi-tag']
         # Enable more robust compiler diagnostics
         base_cpp_args += ['-fconcepts-diagnostics-depth=9999', '-ftemplate-backtrace-limit=0']
-
         # Configure debug arguments for compiling / linking
         # ------------------------------------------------
         base_debug_cpp_args = base_cpp_args
@@ -87,7 +92,6 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
         # endif
         # debug_cpp_args += san_args
         # debug_link_args += san_args
-
         # Configure release arguments for compiling / linking
         # ---------------------------------------------------
         base_release_cpp_args = base_cpp_args
@@ -100,67 +104,62 @@ else
         base_release_cpp_args = base_cpp_args + []
         base_release_link_args = base_link_args + []
 endif
+# Set configuration options based on build type
+# ---------------------------------------------
+buildtype = get_option('buildtype')
+if buildtype in ['debug', 'debugoptimized', 'minsize']  # Meson claims these profiles all have debugging info turned on, so enable debugging features
+        override_options = base_debug_override_options
+        cpp_args = base_debug_cpp_args
+        link_args = base_debug_link_args
+elif buildtype == 'release'
+        override_options = base_release_override_options
+        cpp_args = base_release_cpp_args
+        link_args = base_release_link_args
+elif buildtype == 'plain'  # Unsure about what to do for plain - keep as-is for now.
+        override_options = []
+        cpp_args = []
+        link_args = []
+else
+        error('Unknown buildtype: ' + buildtype)
+endif
 
 {% if cookiecutter.include_cli %}
 # Create CLI executables
 # ----------------------
-cli_sources = [
-        'cli.cpp'
-]
-cli_debug = executable(
-        '{{ cookiecutter.project_name }}_cli_debug',
-        cli_sources,
-        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
-        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
+cli = executable(
+        'cli',
+        [
+                '{{ cookiecutter.project_name }}/cli/cli.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
+        ],
+        {% if cookiecutter.include_source_checker %}source_checker,{% endif %}
+        {% if cookiecutter.include_doxygen %}doc_generator,{% endif %}
         dependencies: dependencies,
-        override_options: base_debug_override_options,
-        cpp_args: base_debug_cpp_args,
-        link_args: base_debug_link_args
-)
-cli_release = executable(
-        '{{ cookiecutter.project_name }}_cli_release',
-        cli_sources,
-        {% if cookiecutter.include_source_checker %} source_checker {% endif %},
-        {% if cookiecutter.include_doxygen %} doc_generator {% endif %},
-        dependencies: dependencies,
-        override_options: base_release_override_options,
-        cpp_args: base_release_cpp_args,
-        link_args: base_release_link_args
+        override_options: override_options,
+        cpp_args: cpp_args,
+        link_args: link_args
 )
 {% endif %}
 
-
-{% if cookiecutter.include_unittests %}
+{% if cookiecutter.include_gtest %}
 # Create unittest executables
 # ---------------------------
 gtest = subproject('gtest')
 gtest_dep = gtest.get_variable('gtest_dep')
 gmock_dep = gtest.get_variable('gmock_dep')
-gtest_sources = [
-        'gtest-all.cpp',
-        '{{ cookiecutter.project_name }}/math/helpers_test.cpp'
-]
 gtest_dependencies = dependencies + [gtest_dep]
-gtest_debug = executable(
-        '{{ cookiecutter.project_name }}_gtest_debug',
-        gtest_sources,
+gtest = executable(
+        'gtest',
+        [
+                '{{ cookiecutter.project_name }}/gtest/gtest-all.cpp',  # Needs to be cpp (h/hpp files are silently ignored)
+                '{{ cookiecutter.project_name }}/math/helpers_test.cpp'
+        ],
         dependencies: gtest_dependencies,
-        override_options: base_debug_override_options,
-        cpp_args: base_debug_cpp_args,
-        link_args: base_debug_link_args
+        override_options: override_options,
+        cpp_args: cpp_args,
+        link_args: link_args
 )
-test('gtest_debug', gtest_debug)
-gtest_release = executable(
-        '{{ cookiecutter.project_name }}_gtest_release',
-        gtest_sources,
-        dependencies: gtest_dependencies,
-        override_options: base_release_override_options,
-        cpp_args: base_release_cpp_args,
-        link_args: base_release_link_args
-)
-test('gtest_release', gtest_release)
+test('gtest', gtest)
 {% endif %}
-
 
 {% if cookiecutter.include_python_extension != 'false' %}
 # Create python extension
