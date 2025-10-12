@@ -1,4 +1,4 @@
-name: build-wheels
+name: run-tests
 on:
   push:
     branches: [main]
@@ -30,25 +30,11 @@ jobs:
     steps:
       - name: Setup
         uses: ./.github/workflows/setup-linux.yml
-      - name: Build wheel
+      - name: Run unittests
         run: |
           # Compile and run.
           meson setup --reconfigure buildDir {{ "--buildtype=${{ matrix.build-type }}" }}
-          python -m build --wheel
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-linux
-          path: dist/*.whl
-          if-no-files-found: error
-      # - name: Publish to Artifactory
-      #   run: |
-      #     python -m pip install --upgrade twine
-      #     twine upload \
-      #       --repository-url https://<artifactory-url>/api/pypi/<repo>/ \
-      #       --username USERNAME \
-      #       --password PASSWORD \
-      #       dist/*.whl
+          meson test -C buildDir -v gtest
   test-windows:
     runs-on: windows-latest
     needs: define-build-type-matrix
@@ -58,26 +44,12 @@ jobs:
     steps:
       - name: Setup
         uses: ./.github/workflows/setup-windows.yml
-      - name: Build wheel
+      - name: Run unittests
         shell: powershell
         run: |
           # Compile and run.
           ./msys.bat "meson setup --reconfigure buildDir {{ "--buildtype=${{ matrix.build-type }}" }}""
-          ./msys.bat "python -m build --wheel"
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-windows
-          path: dist/*.whl
-          if-no-files-found: error
-      # - name: Publish to Artifactory
-      #   run: |
-      #     python -m pip install --upgrade twine
-      #     twine upload \
-      #       --repository-url https://<artifactory-url>/api/pypi/<repo>/ \
-      #       --username USERNAME \
-      #       --password PASSWORD \
-      #       dist/*.whlpython -m build --wheel
+          ./msys.bat "meson test -C buildDir -v gtest"
   test-mac:
     runs-on: macos-latest
     needs: define-build-type-matrix
@@ -87,7 +59,7 @@ jobs:
     steps:
       - name: Setup
         uses: ./.github/workflows/setup-macos.yml
-      - name: Build wheel
+      - name: Run unittests
         run: |
           # Ensure meson finds boost (that was compiled above).
           export BOOST_ROOT="$HOME/boost-gcc"
@@ -107,18 +79,4 @@ jobs:
           export LD="$BREW_BIN/g++-$GCC_VER"
           # Compile and run.
           meson setup --reconfigure buildDir {{ "--buildtype=${{ matrix.build-type }}" }}
-          python -m build --wheel
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-linux
-          path: dist/*.whl
-          if-no-files-found: error
-      # - name: Publish to Artifactory
-      #   run: |
-      #     python -m pip install --upgrade twine
-      #     twine upload \
-      #       --repository-url https://<artifactory-url>/api/pypi/<repo>/ \
-      #       --username USERNAME \
-      #       --password PASSWORD \
-      #       dist/*.whl
+          meson test -C buildDir -v gtest

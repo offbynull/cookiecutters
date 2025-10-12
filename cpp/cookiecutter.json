@@ -1,6 +1,6 @@
 {
     "project_name": "cpp",
-    "min_boost_version": "1.83.0",
+    "min_boost_version": "1.87.0",
     "include_cli": true,
     "include_gtest": true,
     "include_python_extension": ["true_with_numpy", "true", "false"],

@@ -8,21 +8,21 @@ To configure buildtype:
 * `meson configure buildDir -Dbuildtype=minsize`
 * `meson configure buildDir -Dbuildtype=plain`
 
-{% if cookiecutter.include_cli %}
+{% if cookiecutter.include_cli -%}
 To compile and run command-line interface:
 
 * `meson compile -C buildDir cli`
 * `./buildDir/cli`
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_gtest %}
+{% if cookiecutter.include_gtest -%}
 To compile and run GUnit unittests:
 
 * `meson compile -C buildDir gtest`
 * `./buildDir/gtest`
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_python_extension != 'false' %}
+{% if cookiecutter.include_python_extension != 'false' -%}
 To compile and run Python extension:
 
 * `cd {{ cookiecutter.project_name }}`
@@ -35,4 +35,4 @@ To build Python wheel:
 
 * `pip install build`
 * `python3 -m build --wheel` (builds wheel for the OS/arch that's running the command)
-{% endif %}
+{%- endif %}

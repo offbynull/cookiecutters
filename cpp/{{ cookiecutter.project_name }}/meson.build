@@ -7,7 +7,7 @@ project(
 
 dependencies = []
 
-{% if cookiecutter.min_boost_version != 'na' %}
+{% if cookiecutter.min_boost_version != 'na' -%}
 # Include boost dependency
 # ------------------------
 boost_dep = dependency(
@@ -16,9 +16,9 @@ boost_dep = dependency(
         modules : ['container', 'filesystem', 'iostreams']
 )
 dependencies += [boost_dep]
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_source_checker %}
+{% if cookiecutter.include_source_checker -%}
 # Load source checker target
 # --------------------------
 python3 = find_program('python3', required: true)
@@ -28,9 +28,9 @@ source_checker = custom_target(
         output: ['unused'],
         build_always_stale: true
 )
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_doxygen %}
+{% if cookiecutter.include_doxygen -%}
 # Load doxygen target
 # -------------------
 python3 = find_program('python3', required: true)
@@ -42,7 +42,7 @@ doc_generator = custom_target(
         output : ['docs'],
         build_always_stale: true
 )
-{% endif %}
+{%- endif %}
 
 # Configure options
 # -----------------
@@ -123,7 +123,7 @@ else
         error('Unknown buildtype: ' + buildtype)
 endif
 
-{% if cookiecutter.include_cli %}
+{% if cookiecutter.include_cli -%}
 # Create CLI executables
 # ----------------------
 cli = executable(
@@ -131,16 +131,16 @@ cli = executable(
         [
                 '{{ cookiecutter.project_name }}/cli/cli.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
         ],
-        {% if cookiecutter.include_source_checker %}source_checker,{% endif %}
-        {% if cookiecutter.include_doxygen %}doc_generator,{% endif %}
+        {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
+        {% if cookiecutter.include_doxygen -%}doc_generator,{%- endif %}
         dependencies: dependencies,
         override_options: override_options,
         cpp_args: cpp_args,
         link_args: link_args
 )
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_gtest %}
+{% if cookiecutter.include_gtest -%}
 # Create unittest executables
 # ---------------------------
 gtest = subproject('gtest')
@@ -159,15 +159,15 @@ gtest = executable(
         link_args: link_args
 )
 test('gtest', gtest)
-{% endif %}
+{%- endif %}
 
-{% if cookiecutter.include_python_extension != 'false' %}
+{% if cookiecutter.include_python_extension != 'false' -%}
 # Create python extension
 # -----------------------
 py = import('python')
 py_installation = py.find_installation(
         pure: false,
-        modules: [{% if cookiecutter.include_python_extension == 'true_with_numpy' %}'numpy'{% endif %}]
+        modules: [{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}'numpy'{%- endif %}]
 )
 # Include python files must be listed here for inclusion into generated Python package (py and pyi - will non-python files like JSON also work?).
 py_installation.install_sources(
@@ -180,22 +180,22 @@ py_installation.install_sources(
         preserve_path: true
 )
 # Compile and include python C extension
-{% if cookiecutter.include_python_extension == 'true_with_numpy' %}
+{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
 py_numpy_include_dir = run_command(
         py_installation.full_path(),
         ['-c', 'import numpy; print(numpy.get_include())'],
         check: true
 ).stdout().strip()
 py_includes = include_directories(py_numpy_include_dir)
-{% else %}
+{%- else -%}
 py_includes = include_directories()
-{% endif %}
+{%- endif %}
 py_release = py_installation.extension_module(
         'helpers_python_extension',  # Must match name module name in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
         [
                 '{{ cookiecutter.project_name }}/math/helpers_python_extension.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
         ],
-        {% if cookiecutter.include_source_checker %}source_checker,{% endif %}
+        {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
         install: true,
         subdir: '{{ cookiecutter.project_name }}/math',  # Must package path in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
         dependencies: dependencies,
@@ -204,4 +204,4 @@ py_release = py_installation.extension_module(
         cpp_args: base_release_cpp_args,
         link_args: base_release_link_args
 )
-{% endif %}
+{%- endif %}

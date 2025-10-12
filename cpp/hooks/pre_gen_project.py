@@ -28,9 +28,9 @@ def find_pip_package_version(
     return tuple(try_int(g) for g in m_list[0])
 
 if __name__ == '__main__':
-    {% if cookiecutter.include_python_extension != 'false' %}
+    {% if cookiecutter.include_python_extension != 'false' -%}
     python_build_ver = find_pip_package_version('build')
     if not(python_build_ver[0:2] >= (1, 0)):
         raise ValueError(f'Bad python build version {python_build_ver}')
-    {% endif %}
+    {%- endif %}
     ...

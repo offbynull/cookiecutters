@@ -8,8 +8,8 @@
 # import os
 #
 # REMOVE_PATHS = [
-#     '{% if "pip" in cookiecutter.project_name %}requirements.txt{% endif %}',
-#     '{% if "poetry" in cookiecutter.project_name %}poetry.lock{% endif %}',
+#     '{% if "pip" in cookiecutter.project_name -%}requirements.txt{%- endif %}',
+#     '{% if "poetry" in cookiecutter.project_name -%}poetry.lock{%- endif %}',
 # ]
 #
 # for path in REMOVE_PATHS:

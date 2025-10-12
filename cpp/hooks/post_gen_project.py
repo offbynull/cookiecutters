@@ -15,9 +15,9 @@ def run(cmd: list[str]):
         raise ValueError('Failed')
 
 if __name__ == '__main__':
-    {% if cookiecutter.include_gtest %}
+    {% if cookiecutter.include_gtest -%}
     run(['meson', 'wrap', 'install', 'gtest'])
-    {% endif %}
+    {%- endif %}
     run(['meson', 'setup', '--reconfigure', 'buildDir', '--buildtype=debug'])
     run(['meson', 'compile', '-C', 'buildDir'])
     print('The project has been successfully created!')

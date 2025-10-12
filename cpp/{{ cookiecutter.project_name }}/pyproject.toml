@@ -5,17 +5,17 @@ description = "{{ cookiecutter.project_name }}"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-{% if cookiecutter.include_python_extension != 'false' %}
+{% if cookiecutter.include_python_extension != 'false' -%}
     "numpy (>=2.3.3,<3.0.0)",
-{% endif %}
+{%- endif %}
 ]
 
 [build-system]
 requires = [
     "meson-python",
     "meson>=1.4",
-{% if cookiecutter.include_python_extension != 'false' %}
+{% if cookiecutter.include_python_extension != 'false' -%}
     "numpy (>=2.3.3,<3.0.0)",
-{% endif %}
+{%- endif %}
 ]
 build-backend = "mesonpy"
