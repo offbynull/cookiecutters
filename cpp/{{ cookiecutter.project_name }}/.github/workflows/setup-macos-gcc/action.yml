@@ -1,0 +1,107 @@
+# NOTE: If you change something in this workflow (e.g., bug fix, workaround, optimization, ...), make sure the cookiecutter is updated as
+#       well.
+name: setup-macos-gcc
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install deps
+      shell: bash
+      run: |
+        BREW_BIN="$(brew --prefix)/bin"
+        echo "BREW_BIN=$BREW_BIN" >> "$GITHUB_ENV"
+        brew update
+        # Install g++ and gcc.
+        brew install gcc
+        GCC_BIN="$(ls "$BREW_BIN"/gcc-[0-9]* | sort -V | tail -n1)"  # Find gcc binary with ver in name - running "gcc" directly runs clang
+        GCC_VER="$($GCC_BIN -dumpfullversion | xargs)"
+        echo "GCC_VER=$GCC_VER" >> "$GITHUB_ENV"
+        # Install meson and deps required by meson.
+        brew install pkg-config
+        python -m pip install --upgrade pip
+        python -m pip install meson ninja
+        {% if cookiecutter.include_python_extension != 'false' -%}
+        # Install python requirements.
+        python -m pip install build  # Required for building python extension
+        {%- endif %}
+        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        python -m pip install numpy
+        {%- endif %}
+        {% if cookiecutter.min_boost_version != 'na' -%}
+        # DO NOT INSTALL BOOST HERE - Set version for installation in subsequent steps
+        BOOST_VER="{{ cookiecutter.min_boost_version }}"
+        echo "BOOST_VER=$BOOST_VER" >> "$GITHUB_ENV"
+        {%- endif %}
+        {% if cookiecutter.include_doxygen -%}
+        # Install doxygen.
+        brew install graphviz doxygen    # Required for building docs
+        {%- endif %}
+    {% if cookiecutter.min_boost_version != 'na' -%}
+    # WARNING: DO NOT INSTALL BOOST BY INSERTING "brew install boost" above -- it'll install boost compiled against clang instead of g++,
+    #          which is not compatible (libc++ vs libstdc++).
+    - name: Cache Boost
+      id: boost-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/boost-gcc
+        key: {{ "boost-${{ env.BOOST_VER }}-gcc${{ env.GCC_VER }}-${{ runner.os }}-${{ runner.arch }}" }}
+    - name: Build Boost if cache miss
+      if: steps.boost-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Download boost.
+        curl -L "https://archives.boost.io/release/${BOOST_VER}/source/boost_${BOOST_VER//./_}.tar.bz2" | tar -xj -C "$RUNNER_TEMP"
+        cd "$RUNNER_TEMP"/boost_*
+        # Build boost.
+        #
+        # NOTE: The arguments used below have the following meaning...
+        #
+        #        * -j"$(sysctl -n hw.logicalcpu)" utilizes all cores, to keep the build fast.
+        #        * -variant=release builds a release version of boost (as opposed to a debug version).
+        #          (see https://stackoverflow.com/q/73237306)
+        #        * -threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
+        #          means that access to the same object from multiple threads is safe, while thread-aware means that boost objects work
+        #          fine when used solely within a single thread of a multithreaded application.
+        #          (https://stackoverflow.com/a/20991533)
+        #
+        # NOTE: o3 used the following arguments, but I've removed them because either boost's buildsystem already does this, or they're
+        #       not required, or they might end up breaking things.
+        #
+        #        * -cxxflags="-march=native -flto -pipe" -linkflags="-march=native -flto"
+        #          * is machine architecture implicitly set to native already?
+        #          * no need for link-time optimizations. If it's not being enabled implicitly by boost's build system, I'd rather not
+        #            enable it. Even if everything turns out fine, the extra build timecost of enabling it may not be worth the marginal
+        #            benefits.
+        #          * leave whether to use pipe vs temp files to boost's build system.
+        export CC="$BREW_BIN/gcc-$GCC_MAJOR_VER"
+        export CXX="$BREW_BIN/g++-$GCC_MAJOR_VER"
+        ./bootstrap.sh --with-toolset=gcc --prefix="$HOME/boost-gcc"
+        ./b2 \
+            -j"$(sysctl -n hw.logicalcpu)" \
+            variant=release link=static,shared threading=multi \
+            install
+    - name: Prime for building
+      shell: bash
+      run: |
+        # Pull out major version of installed gcc
+        GCC_MAJOR_VER="$(echo "$GCC_VER" | cut -d. -f1)"
+        # Prime env for compiled boost.
+        BOOST_ROOT="$HOME/boost-gcc"
+        echo "BOOST_ROOT=$BOOST_ROOT" >> "$GITHUB_ENV"
+        echo "CPATH=$BOOST_ROOT/include:${CPATH:-}" >> "$GITHUB_ENV"
+        echo "LIBRARY_PATH=$BOOST_ROOT/lib:${LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+        echo "DYLD_LIBRARY_PATH=$BOOST_ROOT/lib:${DYLD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+        # Prime env such that gcc/g++ is used by meson.
+        echo "CC=$BREW_BIN/gcc-$GCC_MAJOR_VER" >> "$GITHUB_ENV"
+        echo "CXX=$BREW_BIN/g++-$GCC_MAJOR_VER" >> "$GITHUB_ENV"
+        # Prime env such that gcc's version of binary utilities is used by meson.
+        #
+        # NOTE: According to o3, AR and RANLIB are not required because we're not building a static library (this is an executable). LD
+        #       also isn't required because meson links via the compiler? This doesn't seem to be entierly true. g++ points meson to
+        #       Apple's clang linker if LD isn't set?
+        echo "AR=$BREW_BIN/gcc-ar-$GCC_MAJOR_VER" >> "$GITHUB_ENV"
+        echo "RANLIB=$BREW_BIN/gcc-ranlib-$GCC_MAJOR_VER" >> "$GITHUB_ENV"
+        echo "LD=$BREW_BIN/g++-$GCC_MAJOR_VER" >> "$GITHUB_ENV"
+    {%- endif %}

@@ -2,7 +2,7 @@ project(
         '{{ cookiecutter.project_name }}',
         'cpp',
         version : '1.0.0',
-        default_options : ['warning_level=everything', 'cpp_std=c++23']
+        default_options : ['warning_level=everything', 'cpp_std={{ cookiecutter.cpp_version }}']
 )
 
 dependencies = []
@@ -132,7 +132,6 @@ cli = executable(
                 '{{ cookiecutter.project_name }}/cli/cli.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
         ],
         {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
-        {% if cookiecutter.include_doxygen -%}doc_generator,{%- endif %}
         dependencies: dependencies,
         override_options: override_options,
         cpp_args: cpp_args,
@@ -153,6 +152,7 @@ gtest = executable(
                 '{{ cookiecutter.project_name }}/gtest/gtest-all.cpp',  # Needs to be cpp (h/hpp files are silently ignored)
                 '{{ cookiecutter.project_name }}/math/helpers_test.cpp'
         ],
+        {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
         dependencies: gtest_dependencies,
         override_options: override_options,
         cpp_args: cpp_args,

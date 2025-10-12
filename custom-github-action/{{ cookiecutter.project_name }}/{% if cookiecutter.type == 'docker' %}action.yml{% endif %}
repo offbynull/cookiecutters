@@ -1,0 +1,19 @@
+name: "{{ cookiecutter.project_name }}"
+inputs:
+  first:
+    description: "1st input"
+    required: true
+  second:
+    description: "2nd input"
+    required: false
+    default: "world"
+outputs:
+  joined:
+    description: "first-second joined with a dash"
+    value: {{ "${{ steps.build.outputs.joined }}" }}
+  total_len:
+    description: "combined length"
+    value: {{ "${{ steps.build.outputs.total_len }}" }}
+runs:
+  using: "docker"
+  image: "Dockerfile"

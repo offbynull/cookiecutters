@@ -1,0 +1,20 @@
+name: test
+on:
+  push:
+    branches: ["main"]
+    workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate
+        id: joiner
+        uses: ./
+        with:
+          first: hello
+          second: world
+      - name: Validate outputs
+        run: |
+          {{ '[ "${{ steps.joiner.outputs.joined }}" = "hello-world" ] || exit 1' }}
+          {{ '[ "${{ steps.joiner.outputs.total_len }}" -eq 11 ] || exit 1' }}

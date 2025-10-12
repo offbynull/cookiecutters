@@ -1,0 +1,14 @@
+const core = require('@actions/core');
+
+try {
+    const first = core.getInput('first');
+    const second = core.getInput('second');
+
+    const joined = `${first}-${second}`;
+    const totalLen = first.length + second.length;
+
+    core.setOutput('joined', joined);
+    core.setOutput('total_len', String(totalLen));
+} catch (err) {
+    core.setFailed(err.message || String(err));
+}

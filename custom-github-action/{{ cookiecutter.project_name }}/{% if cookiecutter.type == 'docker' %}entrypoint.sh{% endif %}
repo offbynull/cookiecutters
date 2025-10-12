@@ -1,0 +1,16 @@
+# entrypoint.py
+import os, sys
+
+first = os.getenv('INPUT_FIRST', '')
+second = os.getenv('INPUT_SECOND', '')
+
+joined = f'{first}-{second}'
+total_len = len(joined)
+
+out_path = os.getenv('GITHUB_OUTPUT')
+with open(out_path, 'a', encoding='utf-8') as f:
+    f.write(f'joined={joined}\n')
+    f.write(f'total_len={total_len}\n')
+
+print(f'joined={joined}')
+print(f'total_len={total_len}')

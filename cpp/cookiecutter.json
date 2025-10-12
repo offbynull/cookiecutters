@@ -1,5 +1,6 @@
 {
-    "project_name": "cpp",
+    "project_name": null,
+    "cpp_version": "c++20",
     "min_boost_version": "1.87.0",
     "include_cli": true,
     "include_gtest": true,

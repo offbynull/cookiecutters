@@ -1,0 +1,39 @@
+name: "{{ cookiecutter.project_name }}"
+inputs:
+  first:
+    description: "1st input"
+    required: true
+  second:
+    description: "2nd input"
+    required: false
+    default: "world"
+outputs:
+  joined:
+    description: "first-second joined with a dash"
+    value: {{ "${{ steps.build.outputs.joined }}" }}
+  total_len:
+    description: "combined length"
+    value: {{ "${{ steps.build.outputs.total_len }}" }}
+runs:
+  using: composite
+  steps:
+    - name: 'Build on Mac/Linux'
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        echo "unix"
+        first="{{ "${{ inputs.first }}" }}"
+        second="{{ "${{ inputs.second }}" }}"
+        joined="${first}-${second}"
+        {{ 'echo "joined=${joined}" >> "$GITHUB_OUTPUT"' }}
+        {{ 'echo "total_len=$((${#first}+${#second}))" >> "$GITHUB_OUTPUT"' }}
+    - name: 'Build on Windows'
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        Write-Host "windows"
+        $first  = {{ "'${{ inputs.first }}'" }}
+        $second = {{ "'${{ inputs.second }}'" }}
+        $joined = "$first-$second"
+        Add-Content $env:GITHUB_OUTPUT "joined=$joined"
+        Add-Content $env:GITHUB_OUTPUT "total_len=$len"

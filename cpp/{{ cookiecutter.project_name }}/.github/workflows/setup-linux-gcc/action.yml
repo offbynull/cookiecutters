@@ -1,0 +1,103 @@
+# NOTE: If you change something in this workflow (e.g., bug fix, workaround, optimization, ...), make sure the cookiecutter is updated as
+#       well.
+name: setup-linux-gcc
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    # NOTE: At the time of writing, "apt install g++" on ubuntu-latest gives you g++ v13. The desired g++ version is >=14, and the only
+    #       way to do that at this point is to explicitly run "apt install g++-14". In the future, it may be that ubuntu-latest changes 
+    #       to a version of Ubuntu where "apt install g++" installs g++ v14 instead of v13, or even a later version than v14 (at which
+    #       point we'd be pointing to an outdate version / the package might have been removed).
+    - name: Install deps
+      shell: bash
+      run: |
+        sudo apt-get update
+        # Install g++ and gcc.
+        sudo apt-get install -y gcc-14 g++-14
+        GCC_VER="$(gcc-14 -dumpfullversion | xargs)"
+        echo "GCC_VER=$GCC_VER" >> "$GITHUB_ENV"
+        # Register g++-14/gcc-14 as the system default g++/gcc-14.
+        #
+        # NOTE: You may be able to replace this step by simply running the following before invoking meson in the step below this one:
+        #
+        #         export CC="gcc-14"
+        #         export CXX="g++-14"
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100  # Include g++-14 as an alernative to g++
+        sudo update-alternatives --set g++ /usr/bin/g++-14                       # Select g++-14 as the alternative for gcc
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100  # Include gcc-14 as alternative to gcc
+        sudo update-alternatives --set gcc /usr/bin/gcc-14                       # Select gcc-14 as the alternative for gcc
+        # Install meson and deps required by meson.
+        sudo apt-get install -y pkg-config  # Required by meson to find dependencies?
+        python -m pip install --upgrade pip
+        python -m pip install meson ninja   # Install meson - ninja is needed by meson to do the actual compiling
+        {% if cookiecutter.include_python_extension != 'false' -%}
+        # Install python requirements.
+        python -m pip install build  # Required for building python extension
+        {%- endif %}
+        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        python -m pip install numpy
+        {%- endif %}
+        {% if cookiecutter.min_boost_version != 'na' -%}
+        # DO NOT INSTALL BOOST HERE - Set version for installation in subsequent steps
+        BOOST_VER="{{ cookiecutter.min_boost_version }}"
+        echo "BOOST_VER=$BOOST_VER" >> "$GITHUB_ENV"
+        {%- endif %}
+        {% if cookiecutter.include_doxygen -%}
+        # Install doxygen.
+        sudo apt-get install -y doxygen graphviz  # Required for building docs
+        {%- endif %}
+    {% if cookiecutter.min_boost_version != 'na' -%}
+    # NOTE: You may be able to download boost via apt in the block above and avoid building from scratch in the steps below. Ensure that
+    #       the version of boost provided by apt is >= min version you're expecting ({{ "${{ env.BOOST_VER }}" }}).
+    - name: Cache Boost
+      id: boost-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/boost-gcc
+        key: {{ "boost-${{ env.BOOST_VER }}-gcc${{ env.GCC_VER }}-${{ runner.os }}-${{ runner.arch }}" }}
+    - name: Build Boost if cache miss
+      if: steps.boost-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Download boost.
+        curl -L "https://archives.boost.io/release/${BOOST_VER}/source/boost_${BOOST_VER//./_}.tar.bz2" | tar -xj -C "$RUNNER_TEMP"
+        cd "$RUNNER_TEMP"/boost_*
+        # Build boost.
+        #
+        # NOTE: The arguments used below have the following meaning...
+        #
+        #        * -j"$(nproc)" utilizes all cores, to keep the build fast.
+        #        * -variant=release builds a release version of boost (as opposed to a debug version).
+        #          (see https://stackoverflow.com/q/73237306)
+        #        * -threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
+        #          means that access to the same object from multiple threads is safe, while thread-aware means that boost objects work
+        #          fine when used solely within a single thread of a multithreaded application.
+        #          (https://stackoverflow.com/a/20991533)
+        #
+        # NOTE: o3 used the following arguments, but I've removed them because either boost's buildsystem already does this, or they're
+        #       not required, or they might end up breaking things.
+        #
+        #        * -cxxflags="-march=native -flto -pipe" -linkflags="-march=native -flto"
+        #          * is machine architecture implicitly set to native already?
+        #          * no need for link-time optimizations. If it's not being enabled implicitly by boost's build system, I'd rather not
+        #            enable it. Even if everything turns out fine, the extra build timecost of enabling it may not be worth the marginal
+        #            benefits.
+        #          * leave whether to use pipe vs temp files to boost's build system.
+        ./bootstrap.sh --with-toolset=gcc --prefix="$HOME/boost-gcc"
+        ./b2 \
+            -j"$(nproc)" \
+            variant=release link=static,shared threading=multi \
+            install
+    - name: Prime for building
+      shell: bash
+      run: |
+        # Prime env for compiled boost.
+        BOOST_ROOT="$HOME/boost-gcc"
+        echo "BOOST_ROOT=$BOOST_ROOT" >> "$GITHUB_ENV"
+        echo "CPATH=$BOOST_ROOT/include:${CPATH:-}" >> "$GITHUB_ENV"
+        echo "LIBRARY_PATH=$BOOST_ROOT/lib:${LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$BOOST_ROOT/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+    {%- endif %}
