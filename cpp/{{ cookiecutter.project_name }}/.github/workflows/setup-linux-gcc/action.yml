@@ -1,12 +1,19 @@
 # NOTE: If you change something in this workflow (e.g., bug fix, workaround, optimization, ...), make sure the cookiecutter is updated as
 #       well.
 name: setup-linux-gcc
+inputs:
+  python-version:
+    description: "Python version"
+    required: true
+    default: "PYTHON_VERSION_NOT_SET"  # Setting required=true seems to do nothing, so set a bad default to make things not work (not
+                                       # setting a default will cause the default to be an empty string - workflow will pass with empty
+                                       # string, but it won't be right).
 runs:
   using: composite
   steps:
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: {{ "${{ inputs.python-version }}" }}
     # NOTE: At the time of writing, "apt install g++" on ubuntu-latest gives you g++ v13. The desired g++ version is >=14, and the only
     #       way to do that at this point is to explicitly run "apt install g++-14". In the future, it may be that ubuntu-latest changes 
     #       to a version of Ubuntu where "apt install g++" installs g++ v14 instead of v13, or even a later version than v14 (at which
@@ -40,24 +47,30 @@ runs:
         {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
         python -m pip install numpy
         {%- endif %}
-        {% if cookiecutter.min_boost_version != 'na' -%}
-        # DO NOT INSTALL BOOST HERE - Set version for installation in subsequent steps
-        BOOST_VER="{{ cookiecutter.min_boost_version }}"
+        {% if cookiecutter.boost_version != 'na' -%}
+        # Set boost version.
+        #
+        # WARNING: Do not install pre-built boost binaries via a package manager. Pre-built boost binaries may not be complete unless built
+        #          from scratch with certain dependendencies present (e.g., NumPy boost component requires your python installation to have
+        #          numpy installed). Instead, set the version of boost to install (installation happens in subsequent steps).
+        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        #          
+        #          If you want boost's python and numpy components available, you must have installed python (and numpy) prior to building.
+        {%- endif %}
+        BOOST_VER="{{ cookiecutter.boost_version }}"
         echo "BOOST_VER=$BOOST_VER" >> "$GITHUB_ENV"
         {%- endif %}
         {% if cookiecutter.include_doxygen -%}
         # Install doxygen.
         sudo apt-get install -y doxygen graphviz  # Required for building docs
         {%- endif %}
-    {% if cookiecutter.min_boost_version != 'na' -%}
-    # NOTE: You may be able to download boost via apt in the block above and avoid building from scratch in the steps below. Ensure that
-    #       the version of boost provided by apt is >= min version you're expecting ({{ "${{ env.BOOST_VER }}" }}).
+    {% if cookiecutter.boost_version != 'na' -%}
     - name: Cache Boost
       id: boost-cache
       uses: actions/cache@v4
       with:
         path: ~/boost-gcc
-        key: {{ "boost-${{ env.BOOST_VER }}-gcc${{ env.GCC_VER }}-${{ runner.os }}-${{ runner.arch }}" }}
+        key: {{ "boost-${{ env.BOOST_VER }}-gcc${{ env.GCC_VER }}-py${{ inputs.python-version  }}-${{ runner.os }}-${{ runner.arch }}" }}
     - name: Build Boost if cache miss
       if: steps.boost-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -69,27 +82,36 @@ runs:
         #
         # NOTE: The arguments used below have the following meaning...
         #
-        #        * -j"$(nproc)" utilizes all cores, to keep the build fast.
-        #        * -variant=release builds a release version of boost (as opposed to a debug version).
-        #          (see https://stackoverflow.com/q/73237306)
-        #        * -threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
+        #        * -j controls how many cores are used to build.
+        #        * variant builds boost library in either "debug" mode or "release" mode.
+        #        * link builds a boost library as either a "static" library (so or DLL) or "static" library.
+        #        * runtime-link builds a boost library against either a "static" CRT or a "static" CRT. This only applies to Windows, where
+        #          the CRT type used for boost must match the CRT type of whatever it is pulling it in. On Linux/Mac, it's silently
+        #          ignored.
+        #        * address-model builds a boost library that's either "32" or "64" bit.
+        #        * threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
         #          means that access to the same object from multiple threads is safe, while thread-aware means that boost objects work
         #          fine when used solely within a single thread of a multithreaded application.
         #          (https://stackoverflow.com/a/20991533)
         #
-        # NOTE: o3 used the following arguments, but I've removed them because either boost's buildsystem already does this, or they're
-        #       not required, or they might end up breaking things.
+        #       Because wheels are intended to be self contained, create static library (link=static). To be safe, keep it thread-aware
+        #       (threading=multi). Don't bother supporting older 32-bit CPUs (address-model=64).
         #
-        #        * -cxxflags="-march=native -flto -pipe" -linkflags="-march=native -flto"
-        #          * is machine architecture implicitly set to native already?
-        #          * no need for link-time optimizations. If it's not being enabled implicitly by boost's build system, I'd rather not
-        #            enable it. Even if everything turns out fine, the extra build timecost of enabling it may not be worth the marginal
-        #            benefits.
-        #          * leave whether to use pipe vs temp files to boost's build system.
-        ./bootstrap.sh --with-toolset=gcc --prefix="$HOME/boost-gcc"
+        # WARNING: If you're building outside of GitHub Actions runners (e.g., as a non-privledged user on your own PC), be careful because
+        #          b2 may not detect numpy and as such silently skip the building of the boost numpy component. b2's default install
+        #          location is "/usr/local/...", which requires root permissions to write to. The obvious solution is to run "sudo b2 ...",
+        #          but that introduces a new problem: Running a command through sudo runs that command on root environment instead of the
+        #          actual user's environment. When b2 queries python to see if numpy is installed, the query will check to see if numpy has
+        #          been installed _for the root user_ as opposed to the actual user's environment (python packages live in the actual
+        #          user's home directory, typically under "~/.local/lib/python<major>.<minor>/site-packages/").
+        #
+        #          This isn't problem inside of the GitHub Actions runners because the user running things has privledged access. For
+        #          non-privledged users use "sudo -E ./b2 ..." so that the command runs against the actual user's environment (as opposed
+        #          to the root user's environment).
+        ./bootstrap.sh --with-toolset=gcc --with-python=python3 --prefix="$HOME/boost-gcc"
         ./b2 \
             -j"$(nproc)" \
-            variant=release link=static,shared threading=multi \
+            variant=release link=static runtime-link=static,shared threading=multi address-model=64 \
             install
     - name: Prime for building
       shell: bash

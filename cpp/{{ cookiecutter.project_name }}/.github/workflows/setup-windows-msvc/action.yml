@@ -1,13 +1,20 @@
 # NOTE: If you change something in this workflow (e.g., bug fix, workaround, optimization, ...), make sure the cookiecutter is updated as
 #       well.
 name: setup-windows-msvc
+inputs:
+  python-version:
+    description: "Python version"
+    required: true
+    default: "PYTHON_VERSION_NOT_SET"  # Setting required=true seems to do nothing, so set a bad default to make things not work (not
+                                       # setting a default will cause the default to be an empty string - workflow will pass with empty
+                                       # string, but it won't be right).
 runs:
   using: composite
   steps:
     - name: Install Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: {{ "${{ inputs.python-version }}" }}
     - name: Setup env for MSVC
       uses: ilammy/msvc-dev-cmd@v1
     - name: Install deps
@@ -29,9 +36,17 @@ runs:
         {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
         python -m pip install numpy
         {%- endif %}
-        {% if cookiecutter.min_boost_version != 'na' -%}
-        # DO NOT INSTALL BOOST HERE - Set version for installation in subsequent steps.
-        $BOOST_VER="{{ cookiecutter.min_boost_version }}"
+        {% if cookiecutter.boost_version != 'na' -%}
+        # Set boost version.
+        #
+        # WARNING: Do not install pre-built boost binaries via a package manager. Pre-built boost binaries may not be complete unless built
+        #          from scratch with certain dependendencies present (e.g., NumPy boost component requires your python installation to have
+        #          numpy installed). Instead, set the version of boost to install (installation happens in subsequent steps).
+        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        #          
+        #          If you want boost's python and numpy components available, you must have installed python (and numpy) prior to building.
+        {%- endif %}
+        $BOOST_VER="{{ cookiecutter.boost_version }}"
         Add-Content $Env:GITHUB_ENV "BOOST_VER=$BOOST_VER"
         {%- endif %}
         {% if cookiecutter.include_doxygen -%}
@@ -42,15 +57,13 @@ runs:
         # Extract MSVC version
         $MSVC_VER = (cl 2>&1 | Select-String -Pattern 'Compiler Version\s*([0-9.]+)' -CaseSensitive:$false).Matches[0].Groups[1].Value
         Add-Content $Env:GITHUB_ENV "MSVC_VER=$MSVC_VER"
-    {% if cookiecutter.min_boost_version != 'na' -%}
-    # NOTE: You may be able to download boost via choco in the block above and avoid building from scratch in the steps below. Ensure
-    #       that the version of boost provided by choco is >= min version you're expecting ({{ cookiecutter.min_boost_version }}).
+    {% if cookiecutter.boost_version != 'na' -%}
     - name: Cache Boost
       id: boost-cache
       uses: actions/cache@v4
       with:
         path: ~/boost-msvc
-        key: {{ "boost-${{ env.BOOST_VER }}-msvc${{ env.MSVC_VER }}-${{ runner.os }}-${{ runner.arch }}" }}
+        key: {{ "boost-${{ env.BOOST_VER }}-msvc${{ env.MSVC_VER }}-py${{ inputs.python-version  }}-${{ runner.os }}-${{ runner.arch }}" }}
     - name: Build Boost if cache miss
       if: steps.boost-cache.outputs.cache-hit != 'true'
       shell: pwsh
@@ -62,16 +75,20 @@ runs:
         #
         # NOTE: The b2 arguments used below have the following meaning...
         #
-        #        * -j $env:NUMBER_OF_PROCESSORS utilizes all cores, to keep the build fast.
-        #        * -variant=release builds a release version of boost (as opposed to a debug version).
-        #          (see https://stackoverflow.com/q/73237306)
-        #        * -threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
+        #        * -j controls how many cores are used to build.
+        #        * variant builds boost library in either "debug" mode or "release" mode.
+        #        * link builds a boost library as either a "static" library (so or DLL) or "static" library.
+        #        * runtime-link builds a boost library against either a "static" CRT or a "static" CRT. This only applies to Windows, where
+        #          the CRT type used for boost must match the CRT type of whatever it is pulling it in. On Linux/Mac, it's silently
+        #          ignored.
+        #        * address-model builds a boost library that's either "32" or "64" bit.
+        #        * threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
         #          means that access to the same object from multiple threads is safe, while thread-aware means that boost objects work
         #          fine when used solely within a single thread of a multithreaded application.
         #          (https://stackoverflow.com/a/20991533)
-        #        * -address-model=64 prevents 32-bit builds: According to o3 if you don't have it there, the build process happens for both
-        #           32-bit and 64-bit platforms. For the 32-bite build, there's no 32-bit version of Python to compile against, and so the
-        #           build fails. As such, this targets only 64-bit.
+        #
+        #       Because wheels are intended to be self contained, create static library (link=static). To be safe, keep it thread-aware
+        #       (threading=multi). Don't bother supporting older 32-bit CPUs (address-model=64).
         #
         # NOTE: Unlike on Mac and Linux, Boost's b2 doesn't use --prefix from bootstrap on Windows. Apparently, it expects that you pass
         #       --prefix into b2 (in addition to bootstrap?).
@@ -92,8 +109,8 @@ runs:
         $boost_src_dir = Get-ChildItem -Path (Join-Path $env:TEMP "boost_*") -Directory | Select-Object -First 1
         Set-Location $boost_src_dir.FullName
         $BOOST_ROOT = Join-Path $HOME 'boost-msvc'
-        ./bootstrap.bat --with-toolset=msvc --prefix=$BOOST_ROOT
-        ./b2 -j $env:NUMBER_OF_PROCESSORS address-model=64 variant=release link=static,shared threading=multi --prefix=$BOOST_ROOT --layout=system install
+        ./bootstrap.bat --with-toolset=msvc  --with-python=python --prefix=$BOOST_ROOT
+        ./b2 -j $env:NUMBER_OF_PROCESSORS variant=release link=static runtime-link=static,shared threading=multi address-model=64 --prefix=$BOOST_ROOT --layout=system install
     - name: Prime for building
       shell: pwsh
       run: |

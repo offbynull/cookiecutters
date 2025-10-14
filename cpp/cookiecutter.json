@@ -1,13 +1,13 @@
 {
     "project_name": null,
     "cpp_version": "c++20",
-    "min_boost_version": "1.87.0",
+    "boost_version": "1.89.0",
     "include_cli": true,
     "include_gtest": true,
     "include_python_extension": ["true_with_numpy", "true", "false"],
     "include_doxygen": true,
     "include_source_checker": true,
     "__prompts__": {
-        "min_boost_version": "min_boost_version - enter 'na' to exclude boost"
+        "boost_version": "boost_version - enter 'na' to exclude boost"
     }
 }

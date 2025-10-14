@@ -1,6 +1,13 @@
 # NOTE: If you change something in this workflow (e.g., bug fix, workaround, optimization, ...), make sure the cookiecutter is updated as
 #       well.
 name: setup-windows-msys2-gcc-ucrt
+inputs:
+  python-version:
+    description: "Python version"
+    required: true
+    default: "PYTHON_VERSION_NOT_SET"  # Setting required=true seems to do nothing, so set a bad default to make things not work (not
+                                       # setting a default will cause the default to be an empty string - workflow will pass with empty
+                                       # string, but it won't be right).
 runs:
   using: composite
   steps:
@@ -73,7 +80,7 @@ runs:
           mingw-w64-ucrt-x86_64-graphviz \
           {%- endif %}
           mingw-w64-ucrt-x86_64-curl \
-          {% if cookiecutter.min_boost_version != 'na' -%}
+          {% if cookiecutter.boost_version != 'na' -%}
           mingw-w64-ucrt-x86_64-dlfcn \
           mingw-w64-ucrt-x86_64-zlib \
           mingw-w64-ucrt-x86_64-bzip2 \
@@ -83,28 +90,39 @@ runs:
           mingw-w64-ucrt-x86_64-openssl
           {%- endif %}
           '
-        {% if cookiecutter.min_boost_version != 'na' -%}
-        # DO NOT INSTALL BOOST HERE - Set version for installation in subsequent steps
+        {% if cookiecutter.include_python_extension != 'false' -%}
+        # WARNING: msys2 does rolling release of Python. It doesn't let you target a specific major-minor version of Python and the GitHub
+        #          setup-python action doesn't extend into / provide support for msys2's enivornments. Short of compiling python from
+        #          source (at the intended major-minor version), the only other thing that can be done is to test if the installed python
+        #          matches the expected major-minor. That test is what's happening here. This must be changed at some point to compile
+        #          python from source (at intended major-minor version).
+        python -c 'import sys; assert "{{ "${{ inputs.python-version }}" }}" == ".".join(map(str, sys.version_info[:2])), f"Bad Python version {sys.version_info}"'
+        {%- endif %}
+        {% if cookiecutter.boost_version != 'na' -%}
+        # Set boost version.
+        #
+        # WARNING: Do not install pre-built boost binaries via a package manager. Pre-built boost binaries may not be complete unless built
+        #          from scratch with certain dependendencies present (e.g., NumPy boost component requires your python installation to have
+        #          numpy installed). Instead, set the version of boost to install (installation happens in subsequent steps).
+        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        #          
+        #          If you want boost's python and numpy components available, you must have installed python (and numpy) prior to building.
+        {%- endif %}
         #
         # NOTE: The pacman packages installed above (after curl) are required for building boost.
-        $BOOST_VER="{{ cookiecutter.min_boost_version }}"
+        $BOOST_VER="{{ cookiecutter.boost_version }}"
         Add-Content $Env:GITHUB_ENV "BOOST_VER=$BOOST_VER"
         {%- endif %}
         # Extract GCC version
         $GCC_VER = (.\msys2.ps1 'gcc -dumpfullversion | xargs').Trim()
         Add-Content $Env:GITHUB_ENV "GCC_VER=$GCC_VER"
-    {% if cookiecutter.min_boost_version != 'na' -%}
-    # NOTE: You may be able to download boost via pacman in the block above and avoid building from scratch in the steps below. Ensure
-    #       that the version of boost provided by pacman is >= min version you're expecting ({{ cookiecutter.min_boost_version }}).
-    #
-    #       As of writing, the version of boost it offers doesn't support numpy2 and so this job fails - it may be that it gets upgraded
-    #       to a proper version.
+    {% if cookiecutter.boost_version != 'na' -%}
     - name: Cache Boost
       id: boost-cache
       uses: actions/cache@v4
       with:
         path: ~/boost-gcc
-        key: {{ "boost-${{ env.BOOST_VER }}-msys2-gcc${{ env.GCC_VER }}-ucrt-${{ runner.os }}-${{ runner.arch }}" }}
+        key: {{ "boost-${{ env.BOOST_VER }}-msys2-ucrt-gcc${{ env.GCC_VER }}-py${{ inputs.python-version  }}-${{ runner.os }}-${{ runner.arch }}" }}
     - name: Build Boost if cache miss
       if: steps.boost-cache.outputs.cache-hit != 'true'
       shell: pwsh
@@ -114,28 +132,22 @@ runs:
         $ErrorActionPreference = 'Stop'
         # Download boost and build.
         #
-        # NOTE: The b2 arguments used below have the following meaning...
+        # NOTE: The arguments used below have the following meaning...
         #
-        #        * -j"$(nproc)"" utilizes all cores, to keep the build fast.
-        #        * -variant=release builds a release version of boost (as opposed to a debug version).
-        #          (see https://stackoverflow.com/q/73237306)
-        #        * -threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
+        #        * -j controls how many cores are used to build.
+        #        * variant builds boost library in either "debug" mode or "release" mode.
+        #        * link builds a boost library as either a "static" library (so or DLL) or "static" library.
+        #        * runtime-link builds a boost library against either a "static" CRT or a "static" CRT. This only applies to Windows, where
+        #          the CRT type used for boost must match the CRT type of whatever it is pulling it in. On Linux/Mac, it's silently
+        #          ignored.
+        #        * address-model builds a boost library that's either "32" or "64" bit.
+        #        * threading-multi builds a thread-aware version of boost. Note that thread-aware does not mean thread-safe: Thread-safe
         #          means that access to the same object from multiple threads is safe, while thread-aware means that boost objects work
         #          fine when used solely within a single thread of a multithreaded application.
         #          (https://stackoverflow.com/a/20991533)
-        #        * -address-model=64 prevents 32-bit builds: According to o3 if you don't have it there, the build process happens for both
-        #           32-bit and 64-bit platforms. For the 32-bite build, there's no 32-bit version of Python to compile against, and so the
-        #           build fails. As such, this targets only 64-bit.
         #
-        # NOTE: o3 used the following arguments, but I've removed them because either boost's buildsystem already does this, or they're
-        #       not required, or they might end up breaking things.
-        #
-        #        * -cxxflags="-march=native -flto -pipe" -linkflags="-march=native -flto"
-        #          * is machine architecture implicitly set to native already?
-        #          * no need for link-time optimizations. If it's not being enabled implicitly by boost's build system, I'd rather not
-        #            enable it. Even if everything turns out fine, the extra build timecost of enabling it may not be worth the marginal
-        #            benefits.
-        #          * leave whether to use pipe vs temp files to boost's build system.
+        #       Because wheels are intended to be self contained, create static library (link=static). To be safe, keep it thread-aware
+        #       (threading=multi). Don't bother supporting older 32-bit CPUs (address-model=64).
         #
         # NOTE: $USERPROFILE points to the Windows user's home directory. That is, the path in cache task directly above this one
         #       (~/boost-gcc) and the path in the commands below ($USERPROFILE/boost-gcc) point to the same directory.
@@ -153,11 +165,10 @@ runs:
             export BOOST_ROOT_WINDOWS_STYLE=""$(cygpath -m ""$USERPROFILE"")/boost-gcc""
             curl -L ""https://archives.boost.io/release/${BOOST_VER}/source/boost_${BOOST_VER//./_}.tar.bz2"" | tar -xj -C ""/tmp"" && \
             cd /tmp/boost_* && \
-            ./bootstrap.sh --with-toolset=gcc --with-python-root=/ucrt64 --prefix=$BOOST_ROOT_WINDOWS_STYLE && \
+            ./bootstrap.sh --with-toolset=gcc --with-python=python3 --with-python-root=/ucrt64 --prefix=$BOOST_ROOT_WINDOWS_STYLE && \
             ./b2 \
               -j""$(nproc)"" \
-              address-model=64 \
-              variant=release link=static,shared threading=multi \
+              variant=release link=static runtime-link=static,shared threading=multi address-model=64 \
               linkflags=""-ldl"" \
               install'
     - name: Prime for building

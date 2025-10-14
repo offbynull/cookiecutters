@@ -18,23 +18,28 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build-types: {{ "${{ steps.define-build-types.outputs.build-types }}" }}
+      python-version: {{ "${{ steps.define-build-types.outputs.python-version }}" }}
     steps:
       - name: Define build types
         id: define-build-types
         run: |
           echo 'build-types=["debug", "release"]' >> "$GITHUB_OUTPUT"
+          echo 'python-version=["3.13"]' >> "$GITHUB_OUTPUT"
   build-cli-linux-gcc:
     runs-on: ubuntu-latest
     needs: define-build-type-matrix
     strategy:
       matrix:
         build-type: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.build-types) }}" }}
+        python-version: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.python-version) }}" }}
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup
         uses: ./.github/workflows/setup-linux-gcc
+        with:
+          python-version: {{ "${{ matrix.python-version }}" }}
       - name: Build cli
         run: |
           # Compile and run.
@@ -52,11 +57,15 @@ jobs:
     strategy:
       matrix:
         build-type: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.build-types) }}" }}
+        python-version: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.python-version) }}" }}
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup
         uses: ./.github/workflows/setup-windows-msys2-gcc-ucrt
+        with:
+          python-version: {{ "${{ matrix.python-version }}" }}
       - name: Build cli
         shell: pwsh
         run: |
@@ -79,11 +88,15 @@ jobs:
     strategy:
       matrix:
         build-type: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.build-types) }}" }}
+        python-version: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.python-version) }}" }}
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup
         uses: ./.github/workflows/setup-windows-msvc
+        with:
+          python-version: {{ "${{ matrix.python-version }}" }}
       - name: Build cli
         shell: pwsh
         run: |
@@ -102,11 +115,15 @@ jobs:
     strategy:
       matrix:
         build-type: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.build-types) }}" }}
+        python-version: {{ "${{ fromJSON(needs.define-build-type-matrix.outputs.python-version) }}" }}
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup
         uses: ./.github/workflows/setup-macos-gcc
+        with:
+          python-version: {{ "${{ matrix.python-version }}" }}
       - name: Build cli
         run: |
           # Compile and run.
