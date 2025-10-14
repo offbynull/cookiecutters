@@ -22,7 +22,19 @@ jobs:
       - name: Define build types
         id: define-build-types
         run: |
-          echo 'build-types=["debug", "release"]' >> "$GITHUB_OUTPUT"
+          # WARNING: Do not place "debug" into build-types. The build-type "debug" is ignored during wheel building (build-type will
+          #          automatically switch to "release" even if meson's been configured to use "debug"). Even if it wasn't, it seems you
+          #          need a special debug version of Python installed because you can't call something built with debug CRT from something
+          #          built with release CRT (is this a Windows only problem?). Even if you had everything you needed, apparently there's a
+          #          requirement that wheels must be release builds only.
+          #
+          #          I tried overriding this functionality so that it builds in debug mode, both with "pip install ." and "python -m build
+          #          --wheel". It doesn't work even when debug python is installed because meson always points to release python
+          #          executables and libraries. There's all kinds of unfortunate nuacnes at play.
+          #
+          #          Best course of action is to do all testing through gtest and just treat the extension as a thin-layer into code that's
+          #          already been tested. 
+          echo 'build-types=["release"]' >> "$GITHUB_OUTPUT"
   build-wheel-linux-gcc:
     runs-on: ubuntu-latest
     needs: define-build-type-matrix

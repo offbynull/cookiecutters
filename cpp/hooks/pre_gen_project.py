@@ -5,6 +5,7 @@
 
 import re
 import subprocess
+import shutil
 
 def try_int(s: str):
     try:
@@ -17,7 +18,8 @@ def find_pip_package_version(
     version_pattern: str = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?'  # semver
 ) -> tuple[int | str, ...]:
     print(f'Checking version of Python package {package}: ', end='')
-    p = subprocess.run(['pip', 'show', package], capture_output=True, check=True)
+    python_exe_path = shutil.which('python3') or shutil.which('python')
+    p = subprocess.run([python_exe_path, '-m', 'pip', 'show', package], capture_output=True, text=True, check=True)
     m_list = re.findall(
         version_pattern,
         str(p.stdout)
