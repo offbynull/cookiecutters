@@ -22,7 +22,7 @@ To compile and run GUnit unittests:
 * `./buildDir/gtest`
 {%- endif %}
 
-{% if cookiecutter.include_python_extension != 'false' -%}
+{% if cookiecutter.include_python_extension != 'na' -%}
 To compile and run Python extension:
 
 * `cd {{ cookiecutter.project_name }}`

@@ -4,10 +4,11 @@
     "boost_version": "1.89.0",
     "include_cli": true,
     "include_gtest": true,
-    "include_python_extension": ["true_with_numpy", "true", "false"],
+    "include_python_extension": ["pybind11_with_numpy", "pybind11", "boost_with_numpy", "boost", "na"],
     "include_doxygen": true,
     "include_source_checker": true,
     "__prompts__": {
-        "boost_version": "boost_version - enter 'na' to exclude boost"
+        "boost_version": "boost_version - enter 'na' to exclude boost",
+        "include_python_extension": "include_python_extension - choose 'na' to skip"
     }
 }

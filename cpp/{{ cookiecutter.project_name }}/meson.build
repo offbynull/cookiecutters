@@ -14,44 +14,77 @@ override_options = []
 cpp_args = []
 link_args = []
 
-{% if cookiecutter.include_python_extension != 'false' -%}
+{% if cookiecutter.include_python_extension != 'na' -%}
 # Include Python dependency
 # -------------------------
 py = import('python')
 py_installation = py.find_installation(
         pure: false,
-        modules: [{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}'numpy'{%- endif %}]
+        modules: [{% if 'numpy' in cookiecutter.include_python_extension -%}'numpy'{%- endif %}]
 )
-dependencies += [py_installation.dependency()]
-# Compile and include python C extension
-{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+# NOTE: Do not add dependency to dependencies list until building the target. Some targets may not need boost.
+py_dependencies = [py_installation.dependency()]
+py_include_dirs = []
+{% if 'numpy' in cookiecutter.include_python_extension -%}
 py_numpy_include_dir = run_command(
         py_installation.full_path(),
         ['-c', 'import numpy; print(numpy.get_include())'],
         check: true
 ).stdout().strip()
-include_dirs += include_directories(py_numpy_include_dir)
+py_include_dirs += [include_directories(py_numpy_include_dir)]
 {%- endif %}
 {%- endif %}
 
 {% if cookiecutter.boost_version != 'na' -%}
 # Include boost dependency
 # ------------------------
-boost_py_version_suffix = py_installation.language_version().replace('.', '')  # Get major ver followed by minor ver, no dot in between. 
+# NOTE: Do not add dependency to dependencies list until building the target. Some targets may not need boost.
 boost_static = true
+boost_modules = [
+        'container',
+        'filesystem',
+        'iostreams'
+]
 boost_dep = dependency(
         'boost',
         version : '={{ cookiecutter.boost_version }}',
-        modules : [
-                'container',
-                'filesystem',
-                'iostreams',
-                {% if cookiecutter.include_python_extension != 'false' -%}'python' + boost_py_version_suffix{%- endif %},
-                {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}'numpy' + boost_py_version_suffix{%- endif %},
-        ],
+        modules : boost_modules,
         static : boost_static
 )
-dependencies += [boost_dep]
+{% if 'boost' in cookiecutter.include_python_extension -%}
+# For python extension, ensure boost's python components are available. This is calling dependency('boost', ...) a second time (with more
+# components) and same the version. There is a chance that boost_dep and boost_dep_py_specific point to different locations, but that
+# chance is rare and as of writing meson doesn't provide an easy way of testing for this. Assume both point to the same boost deployment.
+#
+# NOTE: Do not add dependency to dependencies list until building the target. Some targets may not need boost.
+#
+# WARNING: On Windows, code compiled in debug mode can't link against a python compiled in release mode (or any library compiled in release
+#          mode). Boost, if compiled in debug mode, likely won't have the boost components for python and numpy (if you have it included)
+#          enabled because a debug build of python is required. Even if there was a debug build of Python available, numpy has an internal
+#          C API it uses that's built in release mode and as such links against python in release mode.
+#
+#          To prevent these headaches, boost with python is disabled when the buildtypes is known to compile in debug mode. That means any
+#          target making use of this dependency won't get built.
+buildtype = get_option('buildtype')
+if (
+        (cc.get_id() == 'msvc' or host_machine.system() == 'windows') and
+        buildtype in ['debug', 'debugoptimized', 'minsize']  # Meson claims these buildtypes have debugging turned on
+)
+        boost_dep_py_specific = disabler()
+else
+        boost_py_version_suffix = py_installation.language_version().replace('.', '')  # Get major ver followed by minor ver, no dot in between. 
+        boost_modules_py_specific = boost_modules + [
+                'python' + boost_py_version_suffix,
+                {% if 'numpy' in cookiecutter.include_python_extension -%}'numpy' + boost_py_version_suffix{%- endif %},
+        ]
+        boost_dep_py_specific = dependency(
+                'boost',
+                version : '={{ cookiecutter.boost_version }}',
+                modules : boost_modules_py_specific,
+                static : boost_static
+        )
+endif
+# These defines are required for boost's python packages to work.
 if boost_static
         # https://stackoverflow.com/questions/4120169/msvc-boostpython-static-linking-to-dll-pyd#comment4448650_4121910
         # https://stackoverflow.com/a/35440164
@@ -63,6 +96,7 @@ if boost_static
                 error('Unrecognized compiler')
         endif
 endif
+{%- endif %}
 {%- endif %}
 
 {% if cookiecutter.include_source_checker -%}
@@ -175,7 +209,7 @@ cli = executable(
                 '{{ cookiecutter.project_name }}/cli/cli.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
         ],
         {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
-        dependencies: dependencies,
+        dependencies: dependencies{% if cookiecutter.boost_version != 'na' -%} + [boost_dep]{%- endif %},
         include_directories: include_dirs,
         override_options: override_options,
         cpp_args: cpp_args,
@@ -187,9 +221,8 @@ cli = executable(
 # Create unittest executables
 # ---------------------------
 gtest = subproject('gtest')
-gtest_dep = gtest.get_variable('gtest_dep')
-gmock_dep = gtest.get_variable('gmock_dep')
-gtest_dependencies = dependencies + [gtest_dep]
+gtest_dependency = gtest.get_variable('gtest_dep')
+gmock_dependency = gtest.get_variable('gmock_dep')
 gtest = executable(
         'gtest',
         [
@@ -197,7 +230,7 @@ gtest = executable(
                 '{{ cookiecutter.project_name }}/math/helpers_test.cpp'
         ],
         {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
-        dependencies: gtest_dependencies,
+        dependencies: dependencies + [gtest_dependency]{% if cookiecutter.boost_version != 'na' -%} + [boost_dep]{%- endif %},
         include_directories: include_dirs,
         override_options: override_options,
         cpp_args: cpp_args,
@@ -206,7 +239,7 @@ gtest = executable(
 test('gtest', gtest)
 {%- endif %}
 
-{% if cookiecutter.include_python_extension != 'false' -%}
+{% if cookiecutter.include_python_extension != 'na' -%}
 # Create python extension
 # -----------------------
 # Include python files must be listed here for inclusion into generated Python package (py and pyi - will non-python files like JSON also work?).
@@ -220,6 +253,14 @@ py_installation.install_sources(
         preserve_path: true
 )
 # Compile and include python C extension
+{% if 'boost' in cookiecutter.include_python_extension -%}
+py_dependencies += [boost_dep_py_specific]
+{%- endif %}
+{% if 'pybind11' in cookiecutter.include_python_extension -%}
+pybind11 = subproject('pybind11')
+pybind11_dependency = pybind11.get_variable('pybind11_dep')
+py_dependencies += [pybind11_dependency]
+{%- endif %}
 py_release = py_installation.extension_module(
         'helpers_python_extension',  # Must match name module name in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
         [
@@ -228,8 +269,8 @@ py_release = py_installation.extension_module(
         {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
         install: true,
         subdir: '{{ cookiecutter.project_name }}/math',  # Must package path in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
-        dependencies: dependencies,
-        include_directories: include_dirs,
+        dependencies: dependencies + py_dependencies,
+        include_directories: include_dirs + py_include_dirs,
         override_options: base_release_override_options,
         cpp_args: base_release_cpp_args,
         link_args: base_release_link_args

@@ -5,7 +5,7 @@ description = "{{ cookiecutter.project_name }}"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+{% if 'numpy' in cookiecutter.include_python_extension -%}
     "numpy (>=2.0.0,<3.0.0)",
 {%- endif %}
 ]
@@ -14,7 +14,7 @@ dependencies = [
 requires = [
     "meson-python",
     "meson>=1.4",
-{% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+{% if 'numpy' in cookiecutter.include_python_extension -%}
     "numpy (>=2.0.0,<3.0.0)",
 {%- endif %}
 ]

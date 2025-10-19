@@ -29,11 +29,11 @@ runs:
         # Install meson and deps required by meson.
         python -m pip install --upgrade pip
         python -m pip install meson ninja   # Install meson - ninja is needed by meson to do the actual compiling
-        {% if cookiecutter.include_python_extension != 'false' -%}
+        {% if cookiecutter.include_python_extension != 'na' -%}
         # Install python requirements.
         python -m pip install build  # Required for building python extension
         {%- endif %}
-        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        {% if 'numpy' in cookiecutter.include_python_extension -%}
         python -m pip install numpy
         {%- endif %}
         {% if cookiecutter.boost_version != 'na' -%}
@@ -42,7 +42,7 @@ runs:
         # WARNING: Do not install pre-built boost binaries via a package manager. Pre-built boost binaries may not be complete unless built
         #          from scratch with certain dependendencies present (e.g., NumPy boost component requires your python installation to have
         #          numpy installed). Instead, set the version of boost to install (installation happens in subsequent steps).
-        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        {% if cookiecutter.include_python_extension == 'boost_with_numpy' -%}
         #          
         #          If you want boost's python and numpy components available, you must have installed python (and numpy) prior to building.
         {%- endif %}
@@ -100,6 +100,19 @@ runs:
         #       C:\Users\runneradmin\boost-msvc\include\boost). Apparently, on Linux and Mac, the default is --layout=system while on
         #       Windows it's --layout=versioned. To keep things consistent, --layout=system is explicitly being set.
         #       (see https://manpages.debian.org/bullseye-backports/libboost1.81-tools-dev/b2.1.en.html#The)
+        #
+        # WARNING: On Windows, code compiled in debug mode requires libraries that have also been compiled in debug mode? As such, running
+        #          "./b2 variant=release" instead of "./b2 variant=debug,release" will produce boost libs in release mode, meaning code
+        #          compiled in debug mode will fail to link against boost libs in release mode. 
+        {% if cookiecutter.include_python_extension == 'boost_with_numpy' -%}
+        #
+        #          Also, note that running "./b2 variant=debug,release" will fail to build boost's python and numpy components because a
+        #          debug version of python is required (as per point above). Even if you're able to get a debug version of python,
+        #          attempting to install numpy on it (e.g., pip install numpy) will build from source because numpy doesn't come built for
+        #          the debug version of python.
+        #
+        #          Because of this, be aware that boost's python and numpy components will not be available in debug mode.
+        {%- endif %}
         $BOOST_VER=$env:BOOST_VER
         $ver_us = $BOOST_VER -replace '\.','_'
         $bundle_url = "https://archives.boost.io/release/$BOOST_VER/source/boost_$ver_us.tar.bz2"
@@ -110,7 +123,7 @@ runs:
         Set-Location $boost_src_dir.FullName
         $BOOST_ROOT = Join-Path $HOME 'boost-msvc'
         ./bootstrap.bat --with-toolset=msvc  --with-python=python --prefix=$BOOST_ROOT
-        ./b2 -j $env:NUMBER_OF_PROCESSORS variant=release link=static runtime-link=static,shared threading=multi address-model=64 --prefix=$BOOST_ROOT --layout=system install
+        ./b2 -j $env:NUMBER_OF_PROCESSORS variant=debug,release link=static runtime-link=static,shared threading=multi address-model=64 --prefix=$BOOST_ROOT --layout=system install
     - name: Prime for building
       shell: pwsh
       run: |

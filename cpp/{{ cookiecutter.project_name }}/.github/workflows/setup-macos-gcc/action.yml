@@ -29,11 +29,11 @@ runs:
         brew install pkg-config
         python -m pip install --upgrade pip
         python -m pip install meson ninja
-        {% if cookiecutter.include_python_extension != 'false' -%}
+        {% if cookiecutter.include_python_extension != 'na' -%}
         # Install python requirements.
         python -m pip install build  # Required for building python extension
         {%- endif %}
-        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        {% if 'numpy' in cookiecutter.include_python_extension -%}
         python -m pip install numpy
         {%- endif %}
         {% if cookiecutter.boost_version != 'na' -%}
@@ -42,7 +42,7 @@ runs:
         # WARNING: Do not install pre-built boost binaries via a package manager. Pre-built boost binaries may not be complete unless built
         #          from scratch with certain dependendencies present (e.g., NumPy boost component requires your python installation to have
         #          numpy installed). Instead, set the version of boost to install (installation happens in subsequent steps).
-        {% if cookiecutter.include_python_extension == 'true_with_numpy' -%}
+        {% if cookiecutter.include_python_extension == 'boost_with_numpy' -%}
         #          
         #          If you want boost's python and numpy components available, you must have installed python (and numpy) prior to building.
         {%- endif %}
