@@ -13,4 +13,4 @@ namespace {{ cookiecutter.project_name }}::cli::cli {
     };
 }
 
-#endif // {{ cookiecutter.project_name|upper }}_CLI_CLI_H
+#endif //{{ cookiecutter.project_name|upper }}_CLI_CLI_H

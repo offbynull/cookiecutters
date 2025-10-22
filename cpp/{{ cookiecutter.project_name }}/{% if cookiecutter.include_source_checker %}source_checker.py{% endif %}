@@ -52,7 +52,7 @@ def check_test_group_name(path: Path, content: str):
     return result
 
 
-SYSTEM_TYPE_TO_HEADER_MAPPING = {
+TYPE_TO_LIBRARY_HEADER_MAPPING = {
     'std::ranges::range': 'ranges',
     'std::ranges::forward_range': 'ranges',
     'std::ranges::bidirectional_range': 'ranges',
@@ -110,6 +110,7 @@ SYSTEM_TYPE_TO_HEADER_MAPPING = {
     'std::invoke_result_t': 'type_traits',
     'std::conditional_t': 'type_traits',
     'std::numeric_limits': 'limits',
+    'std::accumulate': 'numeric',
     'std::begin': 'iterator',
     'std::end': 'iterator',
     'std::advance': 'iterator',
@@ -231,7 +232,16 @@ SYSTEM_TYPE_TO_HEADER_MAPPING = {
     'boost::iostreams::mapped_file_base::readonly': 'boost/iostreams/device/mapped_file.hpp',
     'boost::safe_numerics': 'boost/safe_numerics/safe_integer.hpp',
     'boost::safe_numerics::safe_numerics_error': 'boost/safe_numerics/safe_integer.hpp',
+    'boost::python::object': 'boost/python.hpp',
+    'boost::python::def': 'boost/python.hpp',
+    'boost::python::stl_input_iterator':  'boost/python/stl_iterator.hpp',
 }
+
+IGNORE_LIBRARY_HEADERS = set([
+    {% if cookiecutter.include_python_extension != 'na' -%}'Python.h',{%- endif %}
+    {% if 'pybind11' in cookiecutter.include_python_extension -%}'pybind11/pybind11.h',{%- endif %}
+    {% if 'pybind11' in cookiecutter.include_python_extension -%}'pybind11/stl.h',{%- endif %}
+])
 
 
 def check_system_includes(path: Path, content: str):
@@ -251,7 +261,7 @@ def check_system_includes(path: Path, content: str):
             if usage in usages:
                 continue
             usages.add(usage)
-            expected_include = SYSTEM_TYPE_TO_HEADER_MAPPING.get(usage, None)
+            expected_include = TYPE_TO_LIBRARY_HEADER_MAPPING.get(usage, None)
             expected_includes.add(expected_include)
             if expected_include is None:
                 print(f'{path}: No include mapping for {usage}')
@@ -259,7 +269,7 @@ def check_system_includes(path: Path, content: str):
             elif expected_include not in found_includes:
                 print(f'{path}: {usage} requires include {expected_include}')
                 result = CheckResult.FAIL
-    excess_includes = found_includes - expected_includes
+    excess_includes = found_includes - expected_includes - IGNORE_LIBRARY_HEADERS
     if excess_includes:
         for excess_include in excess_includes:
             print(f'{path}: {excess_include} included but not required')
@@ -286,7 +296,7 @@ def check_line_length(path: Path, content: str):
 
 def main():
     result = CheckResult.SUCCESS
-    base_path = Path(__file__).resolve().parent / 'offbynull'
+    base_path = Path(__file__).resolve().parent / {{ cookiecutter.project_name | pprint }}
     for source_path in base_path.rglob('*'):
         if source_path.suffix == '.h':
             if check_guards(source_path, source_path.read_text()) == CheckResult.FAIL:

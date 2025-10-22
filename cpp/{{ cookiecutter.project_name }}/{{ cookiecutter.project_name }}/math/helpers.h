@@ -4,7 +4,6 @@
 #include <vector>
 #include <numeric>
 #include <concepts>
-#include <type_traits>
 
 namespace {{ cookiecutter.project_name|lower }}::math::helpers {
     /**
@@ -39,4 +38,4 @@ namespace {{ cookiecutter.project_name|lower }}::math::helpers {
     };
 }
 
-#endif // {{ cookiecutter.project_name|upper }}_MATH_HELPERS_H
+#endif //{{ cookiecutter.project_name|upper }}_MATH_HELPERS_H

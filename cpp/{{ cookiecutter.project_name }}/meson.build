@@ -261,11 +261,12 @@ pybind11 = subproject('pybind11')
 pybind11_dependency = pybind11.get_variable('pybind11_dep')
 py_dependencies += [pybind11_dependency]
 {%- endif %}
+py_sources = [
+        '{{ cookiecutter.project_name }}/math/helpers_python_extension.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
+]
 py_release = py_installation.extension_module(
         'helpers_python_extension',  # Must match name module name in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
-        [
-                '{{ cookiecutter.project_name }}/math/helpers_python_extension.cpp'  # Needs to be cpp (h/hpp files are silently ignored)
-        ],
+        py_sources,
         {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
         install: true,
         subdir: '{{ cookiecutter.project_name }}/math',  # Must package path in '{{ cookiecutter.project_name }}/math/helpers_python_extension.h'
@@ -274,5 +275,30 @@ py_release = py_installation.extension_module(
         override_options: base_release_override_options,
         cpp_args: base_release_cpp_args,
         link_args: base_release_link_args
+)
+# For auto-complete to work in IDEs like CLion, the target being built needs to reference the appropriate header files / libraries. Use
+# this target when working on the python extension so you get full IDE support.
+#
+# WARNING: To prevent linker errors when building this, an "embedded" version of the python dependency is being used. Note that
+#          py_dependencies already has the normal non-embedded python dependency in it, and so adding the embedded version means that the
+#          python dependency is now being fed twice (once in non-embedded form and once in embedded form). This doesn't seem to be causing
+#          any issues so far, but if it does remove the non-embedded version before continuing.
+#
+# WARNING: Note that what's being built is a *static* library. It seems that on some platforms, *shared* libraries (not static, but shared)
+#          require that whatever they're linking against have PIC turned on? When boost is built as a static library, it doesn't have PIC
+#          turned on, and so using static boost from a shared library seems tocause the linker to blow up. It seems b2 does provide a
+#          "-pic" option but it's disabled by default when building as a static library.
+#
+#          Since this target isn't being used for anything other than making it easier to work in an IDE, keep it as a static library.
+py_dependencies_embedded = py_dependencies + [py_installation.dependency(embed: true)]
+helpers_python_extension_mock = static_library(
+        'helpers_python_extension_mock',
+        py_sources,
+        {% if cookiecutter.include_source_checker -%}source_checker,{%- endif %}
+        dependencies: dependencies + py_dependencies_embedded,
+        include_directories: include_dirs + py_include_dirs,
+        override_options: override_options,
+        cpp_args: cpp_args,
+        link_args: link_args
 )
 {%- endif %}

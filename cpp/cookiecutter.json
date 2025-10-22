@@ -8,6 +8,7 @@
     "include_doxygen": true,
     "include_source_checker": true,
     "__prompts__": {
+        "project_name": "project_name - require lowercase ASCII letters/numbers and underscores",
         "boost_version": "boost_version - enter 'na' to exclude boost",
         "include_python_extension": "include_python_extension - choose 'na' to skip"
     }

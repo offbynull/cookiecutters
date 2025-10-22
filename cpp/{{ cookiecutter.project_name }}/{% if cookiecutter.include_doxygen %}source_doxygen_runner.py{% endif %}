@@ -13,7 +13,7 @@ if __name__ == '__main__':
     shutil.copyfile(doxygen_config_path, doxygen_config_temp_path.name)
     with open(doxygen_config_temp_path.name, 'a') as f:
         f.writelines([
-            f'INPUT = {root_path / 'offbynull'}\n'
+            'INPUT = ' + (root_path / {{ cookiecutter.project_name | pprint }}) + '\n'
         ],)
     result = subprocess.run(['doxygen', doxygen_config_temp_path.name], shell=False, stdout=None, stderr=None)
     exit(result.returncode)

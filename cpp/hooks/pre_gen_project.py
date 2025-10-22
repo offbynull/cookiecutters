@@ -29,7 +29,11 @@ def find_pip_package_version(
     print(m_list[0])
     return tuple(try_int(g) for g in m_list[0])
 
+PROJECT_NAME_PATTERN = r'[0-9a-z_]+'
+
 if __name__ == '__main__':
+    if not re.fullmatch(PROJECT_NAME_PATTERN, {{ cookiecutter.project_name | pprint}}):
+        raise ValueError({{ cookiecutter.project_name | pprint }} + f' does not conform to expected pattern {PROJECT_NAME_PATTERN}')
     {% if cookiecutter.include_python_extension != 'na' -%}
     python_build_ver = find_pip_package_version('build')
     if not(python_build_ver[0:2] >= (1, 0)):
